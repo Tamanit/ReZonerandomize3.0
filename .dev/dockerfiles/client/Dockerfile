@@ -1,4 +1,4 @@
-# Use the latest LTS version of Node.js
+ARG NODE_VERSION
 FROM node:$NODE_VERSION
 
 # Set the working directory inside the container

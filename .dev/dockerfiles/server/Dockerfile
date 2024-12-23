@@ -1,3 +1,5 @@
+ARG PHP_VERSION
+
 FROM php:$PHP_VERSION
 
 COPY config/php/php.ini /usr/local/etc/php/conf.d/docker-php-config.ini
