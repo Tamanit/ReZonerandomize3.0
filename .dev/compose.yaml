@@ -1,0 +1,105 @@
+services:
+  db:
+    container_name: ${APP_NAME}-db
+    image: postgres:${POSTGRES_VERSION}
+    ports:
+      - ${DB_PUBLISH_PORT}:5432
+    shm_size: 128mb
+    restart: unless-stopped
+    volumes:
+      - ../var/postgres-data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+      - POSTGRES_USER=${DB_USER}
+      - POSTGRES_DB=${DB_SCHEMA}
+    networks:
+      - backend
+
+  symfony:
+    container_name: ${APP_NAME}-symfony
+    build:
+      context: ../.
+      dockerfile: .dev/dockerfiles/server/Dockerfile
+      args:
+        PHP_VERSION: ${PHP_VERSION}
+    restart: unless-stopped
+    volumes:
+      - ../server:/var/www/symfony
+    depends_on:
+      - db
+      - minio
+      - redis
+    networks:
+      - api
+      - backend
+
+  nginx:
+    container_name: ${APP_NAME}-nginx
+    build:
+      context: ../.
+      dockerfile: .dev/dockerfiles/nginx/Dockerfile
+      args:
+        NGINX_VERSION: ${NGINX_VERSION}
+    restart: unless-stopped
+    environment:
+      NGINX_DOMAIN: ${NGINX_DOMAIN}
+    volumes:
+      - ../logs/nginx:/var/log/nginx
+      - ../server/public:/var/www/symfony/public
+      - ../client/public:/var/www/client/public
+    ports:
+      - ${NGINX_PUBLISH_PORT}:80
+    depends_on:
+      - symfony
+      - client
+    networks:
+      - client
+      - api
+
+  client:
+    container_name: ${APP_NAME}-client
+    build:
+      context: ../.
+      dockerfile: .dev/dockerfiles/client/Dockerfile
+      args:
+        NODE_VERSION: ${NODE_VERSION}
+    restart: unless-stopped
+    volumes:
+      - ../client:/app
+      - ../client/node_modules:/app/node_modules
+    environment:
+      NODE_ENV: ${NODE_ENV}
+    depends_on:
+      - symfony
+    networks:
+      - client
+
+  redis:
+    container_name: ${APP_NAME}-redis
+    image: redis:${REDIS_VERSION}
+    restart: unless-stopped
+    volumes:
+      - ../var/redis-data:/root/redis
+      - ../config/redis.conf:/usr/local/etc/redis/redis.conf
+    environment:
+      - REDIS_PORT=${REDIS_PORT}
+      - REDIS_DATABASES=${REDIS_DATABASE}
+    networks:
+      - backend
+
+  minio:
+    container_name: ${APP_NAME}-minio
+    image: minio/minio:${MINIO_VERSION}
+    environment:
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY}
+    volumes:
+      - ../var/minio-data:/data
+    command: server /data
+    networks:
+      - backend
+
+networks:
+  backend:
+  client:
+  api:
